@@ -12,15 +12,15 @@ struct AudioAnalyzerVisualizer_NEWApp: App {
     @StateObject private var model = AppModel()
 
     var body: some Scene {
-        WindowGroup("Початок", id: "start") {
-            StartView()
-                .environmentObject(model)
-        }
-        .defaultSize(width: 600, height: 420)
-
-        WindowGroup("Аналіз", id: "analysis") {
-            ContentView()
-                .environmentObject(model)
+        WindowGroup {
+            Group {
+                if model.docs.isEmpty {
+                    StartView()
+                } else {
+                    ContentView()
+                }
+            }
+            .environmentObject(model)
         }
         .defaultSize(width: 1100, height: 820)
     }

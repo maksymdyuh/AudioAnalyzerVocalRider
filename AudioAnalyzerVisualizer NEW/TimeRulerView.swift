@@ -2,6 +2,8 @@ import SwiftUI
 
 struct TimeRulerView: View {
     let duration: Double
+    var timeZoom: CGFloat = 1.0
+    var timeStart: CGFloat = 0.0
 
     private func marks() -> [Double] {
         guard duration > 0 else { return [] }
@@ -28,19 +30,24 @@ struct TimeRulerView: View {
             let w = geo.size.width
             let h = geo.size.height
             let ms = marks()
+            let f = max(1.0 / max(timeZoom, 0.000001), 0.000001)
             ZStack(alignment: .topLeading) {
                 Rectangle().fill(Color.clear)
                 ForEach(Array(ms.enumerated()), id: \.offset) { _, t in
-                    let x = CGFloat(t / max(duration, 0.000001)) * w
-                    Path { p in
-                        p.move(to: CGPoint(x: x, y: 0))
-                        p.addLine(to: CGPoint(x: x, y: h))
+                    let norm = CGFloat(t / max(duration, 0.000001))
+                    let rel = (norm - timeStart) / f
+                    let x = rel * w
+                    if x >= -40 && x <= w + 40 { // small padding
+                        Path { p in
+                            p.move(to: CGPoint(x: x, y: 0))
+                            p.addLine(to: CGPoint(x: x, y: h))
+                        }
+                        .stroke(Color.gray.opacity(0.25), lineWidth: 1)
+                        Text(formatTime(t))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .position(x: min(max(20, x + 12), w - 20), y: h/2)
                     }
-                    .stroke(Color.gray.opacity(0.25), lineWidth: 1)
-                    Text(formatTime(t))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .position(x: min(max(20, x + 12), w - 20), y: h/2)
                 }
             }
         }

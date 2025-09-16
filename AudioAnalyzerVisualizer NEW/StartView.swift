@@ -28,8 +28,6 @@ struct StartView: View {
     @EnvironmentObject var model: AppModel
     #if os(macOS)
     @State private var isTargeted: Bool = false
-    @Environment(\.openWindow) private var openWindow
-    @Environment(\.dismissWindow) private var dismissWindow
     #endif
 
     var body: some View {
@@ -50,10 +48,6 @@ struct StartView: View {
 
                 Button(role: .none) {
                     if !model.docs.isEmpty {
-                        #if os(macOS)
-                        openWindow(id: "analysis")
-                        dismissWindow(id: "start")
-                        #endif
                         Task { await model.analyzeAllPending() }
                     }
                 } label: {

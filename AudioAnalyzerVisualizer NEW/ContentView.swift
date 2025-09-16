@@ -18,107 +18,188 @@ struct ContentView: View {
     #if os(macOS)
     @State private var isDropTarget: Bool = false
     @State private var keyMonitor: Any?
+    @State private var eventMonitor: Any?
     #endif
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+
+            // Custom browser-like tab strip
+            if !model.docs.isEmpty {
+                TabStripView(docs: model.docs, selection: $model.selectedDocID, onClose: { id in
+                    model.closeDoc(id: id)
+                })
+            }
 
             if model.docs.contains(where: { $0.isAnalyzing }) {
                 HStack { ProgressView(); Text("Аналізую…") }.padding(.vertical, 4)
             }
 
             if !model.docs.isEmpty {
-                TabView(selection: $model.selectedDocID) {
-                    ForEach(model.docs, id: \.id) { doc in
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                Text(doc.url.lastPathComponent)
-                                    .font(.headline)
-                                Spacer()
-                                // Close tab button
-                                Button(role: .destructive) {
-                                    model.closeDoc(id: doc.id)
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                }
-                                .buttonStyle(.plain)
-                                .help("Закрити вкладку")
+                // Обираємо активний документ
+                if let sel = model.selectedDocID ?? model.docs.first?.id,
+                   let doc = model.docs.first(where: { $0.id == sel }) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Text(doc.url.lastPathComponent)
+                                .font(.headline)
+                            Spacer()
+                            // Close tab button
+                            Button(role: .destructive) {
+                                model.closeDoc(id: doc.id)
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
                             }
-                            if let res = doc.result {
-                                GroupBox {
-                                    VStack(alignment: .leading, spacing: 10) {
-                                        Text(String(format: "avg level: %.1f dBFS", res.averageRMSdB))
-                                            .font(.headline)
-                                        Text(metaLine(result: res, url: doc.url))
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                        // Time ruler and current/total time
-                                        TimeRulerView(duration: res.duration)
+                            .buttonStyle(.plain)
+                            .help("Закрити вкладку")
+                        }
+                        if let res = doc.result {
+                            GroupBox {
+                                VStack(alignment: .leading, spacing: 10) {
+Text(String(format: "Середній рівень: %.1f dBFS", res.averageRMSdB))
+                                        .font(.headline)
+                                    Text(metaLine(result: res, url: doc.url))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    // Time ruler and current/total time
+                                        TimeRulerView(duration: res.duration, timeZoom: timeZoom, timeStart: timeStart)
                                             .frame(height: 20)
 
-                                        ZStack {
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .fill(LinearGradient(colors: [Color.black.opacity(0.03), Color.black.opacity(0.06)], startPoint: .top, endPoint: .bottom))
-                                            HStack(spacing: 6) {
-                                                WaveformView(samplesDB: res.windowRMSdB, lineColor: .accentColor, showGrid: true, amplitudeScale: amplitudeScale)
-                                                    .padding(.vertical, 8)
-                                                    .padding(.horizontal, 4)
-                                                    .overlay(
-                                                        GeometryReader { geo in
-                                                            ZStack(alignment: .topLeading) {
-                                                                let x = max(0, min(geo.size.width, geo.size.width * playheadProgress))
-                                                                Path { p in
-                                                                    p.move(to: CGPoint(x: x, y: 0))
-                                                                    p.addLine(to: CGPoint(x: x, y: geo.size.height))
-                                                                }
-                                                                .stroke(Color.white, lineWidth: 1.5)
-
-                                                                Color.clear
-                                                                    .contentShape(Rectangle())
-                                                                    .gesture(DragGesture(minimumDistance: 0).onEnded { v in
-                                                                        let localX = max(0, min(v.location.x, geo.size.width))
-                                                                        let progress = localX / max(geo.size.width, 0.000001)
-                                                                        playheadProgress = progress
-                                                                        audioPlayer?.currentTime = res.duration * progress
-                                                                    })
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(LinearGradient(colors: [Color.black.opacity(0.03), Color.black.opacity(0.06)], startPoint: .top, endPoint: .bottom))
+                                        HStack(spacing: 6) {
+                                            WaveformView(samplesDB: res.windowRMSdB, lineColor: .accentColor, showGrid: true, amplitudeScale: amplitudeScale, timeZoom: timeZoom, timeStart: timeStart)
+                                                .padding(.vertical, 8)
+                                                .padding(.horizontal, 4)
+                                                .overlay(
+GeometryReader { geo in
+                                                    ZStack(alignment: .topLeading) {
+                                                        // Keep overlayWidth updated
+                                                        Color.clear
+                                                            .onAppear { overlayWidth = max(geo.size.width, 1) }
+                                                            .onChange(of: geo.size.width) { newW in
+                                                                overlayWidth = max(newW, 1)
                                                             }
-                                                        }
-                                                    )
-                                                // Vertical zoom slider (same height as meter)
-                                                VStack {
-                                                    Slider(value: $amplitudeScale, in: 0.5...5.0)
-                                                        .rotationEffect(.degrees(-90))
-                                                        .frame(height: meterHeight)
-                                                        .scaleEffect(1.4)
-                                                        .padding(.horizontal, 4)
-                                                }
-                                                .frame(width: 56)
 
-                                                GainMeterView(currentDB: currentDB(res: res), peakHoldDB: peakHoldDB)
-                                                    .frame(width: 26, height: meterHeight)
+                                                        let f = max(1.0 / max(timeZoom, 0.000001), 0.000001)
+                                                        let rel = (playheadProgress - timeStart) / f
+                                                        let x = max(0, min(geo.size.width, geo.size.width * rel))
+                                                        Path { p in
+                                                            p.move(to: CGPoint(x: x, y: 0))
+                                                            p.addLine(to: CGPoint(x: x, y: geo.size.height))
+                                                        }
+                                                        .stroke(Color.white, lineWidth: 1.5)
+
+                                                        // Wheel zoom/pan handler (behind tap gesture)
+                                                        #if os(macOS)
+                                                        WheelZoomView(
+                                                            onZoom: { scaleDelta, relX in
+                                                                let f0 = max(1.0 / max(timeZoom, 0.000001), 0.000001)
+                                                                var z = timeZoom * scaleDelta
+                                                                z = max(1.0, min(64.0, z))
+                                                                let f1 = max(1.0 / max(z, 0.000001), 0.000001)
+                                                                let centerAbs = timeStart + f0 * clamp(relX, 0, 1)
+                                                                var newStart = centerAbs - f1 * clamp(relX, 0, 1)
+                                                                newStart = clamp(newStart, 0, 1 - f1)
+                                                                timeZoom = z
+                                                                timeStart = newStart
+                                                            },
+                                                            onPan: { deltaRel in
+                                                                let f = max(1.0 / max(timeZoom, 0.000001), 0.000001)
+                                                                let newStart = clamp(timeStart + deltaRel * f, 0, 1 - f)
+                                                                timeStart = newStart
+                                                            }
+                                                        )
+                                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                                        // Mouse position tracker to set zoom center under cursor
+                                                        MouseTrackingView { relX in
+                                                            cursorRelX = relX
+                                                            cursorInsideWaveform = true
+                                                        }
+                                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                                        .allowsHitTesting(false)
+                                                        #endif
+
+                                                        Color.clear
+                                                            .contentShape(Rectangle())
+                                                            .gesture(DragGesture(minimumDistance: 0).onEnded { v in
+                                                                let localX = max(0, min(v.location.x, geo.size.width))
+                                                                let f = max(1.0 / max(timeZoom, 0.000001), 0.000001)
+                                                                let rel = localX / max(geo.size.width, 0.000001)
+                                                                let progress = max(0, min(1, timeStart + f * rel))
+                                                                playheadProgress = progress
+                                                                audioPlayer?.currentTime = res.duration * progress
+                                                            })
+                                                        // Horizontal pan (drag gesture)
+                                                        .simultaneousGesture(DragGesture(minimumDistance: 2).onChanged { v in
+                                                            let f = max(1.0 / max(timeZoom, 0.000001), 0.000001)
+                                                            if !isPanning {
+                                                                panStartSnapshot = timeStart
+                                                                isPanning = true
+                                                            }
+                                                            let delta = -v.translation.width / max(geo.size.width, 0.000001) * f
+                                                            let newStart = clamp(panStartSnapshot + delta, 0, 1 - f)
+                                                            timeStart = newStart
+                                                        }.onEnded { _ in
+                                                            isPanning = false
+                                                        })
+// Pinch to zoom (centered at cursor)
+                                                        .simultaneousGesture(MagnificationGesture().onChanged { scale in
+                                                            if !isZooming {
+                                                                zoomStartSnapshot = timeZoom
+                                                                isZooming = true
+                                                                zoomCenterRelSnapshot = cursorRelX
+                                                            }
+                                                            var z = zoomStartSnapshot * scale
+                                                            z = max(1.0, min(64.0, z))
+                                                            let f0 = max(1.0 / max(zoomStartSnapshot, 0.000001), 0.000001)
+                                                            let f1 = max(1.0 / max(z, 0.000001), 0.000001)
+                                                            // Keep time under cursor fixed
+                                                            let rel = clamp(zoomCenterRelSnapshot, 0, 1)
+                                                            let centerAbs = timeStart + f0 * rel
+                                                            var newStart = centerAbs - f1 * rel
+                                                            newStart = clamp(newStart, 0, 1 - f1)
+                                                            timeZoom = z
+                                                            timeStart = newStart
+                                                        }.onEnded { _ in
+                                                            isZooming = false
+                                                        })
+                                                    }
+                                                }
+                                                )
+                                            // Vertical zoom slider (same height as meter)
+                                            VStack {
+                                                Slider(value: $amplitudeScale, in: 0.5...5.0)
+                                                    .rotationEffect(.degrees(-90))
+                                                    .frame(height: meterHeight)
+                                                    .scaleEffect(1.4)
+                                                    .padding(.horizontal, 4)
                                             }
+                                            .frame(width: 56)
+
+                                            GainMeterView(currentDB: currentDB(res: res), peakHoldDB: peakHoldDB)
+                                                .frame(width: 26, height: meterHeight)
                                         }
-                                        .overlay(alignment: .topLeading) {
-                                            Text("\(formatTime(seconds: currentTime(res: res)))/\(formatTime(seconds: res.duration))")
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                                .padding(6)
-                                        }
-.frame(height: meterHeight + 20)
                                     }
+                                    .overlay(alignment: .topLeading) {
+                                        Text("\(formatTime(seconds: currentTime(res: res)))/\(formatTime(seconds: res.duration))")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .padding(6)
+                                    }
+.frame(height: meterHeight + 20)
                                 }
-                            } else if doc.isAnalyzing {
-                                HStack { ProgressView(); Text("Аналізую…") }.padding(.vertical, 4)
-                            } else if let err = doc.errorMessage {
-                                Text(err).foregroundColor(.red)
-                            } else {
-                                Text("Немає результату").foregroundStyle(.secondary)
                             }
+                        } else if doc.isAnalyzing {
+                            HStack { ProgressView(); Text("Аналізую…") }.padding(.vertical, 4)
+                        } else if let err = doc.errorMessage {
+                            Text(err).foregroundColor(.red)
+                        } else {
+                            Text("Немає результату").foregroundStyle(.secondary)
                         }
-                        .padding(.vertical, 4)
-                        .tabItem { Text(doc.url.lastPathComponent) }
-                        .tag(doc.id)
                     }
+                    .padding(.vertical, 4)
                 }
             }
 
@@ -134,11 +215,51 @@ struct ContentView: View {
                 }
                 return event
             }
+            eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .magnify]) { ev in
+                guard cursorInsideWaveform else { return ev }
+                let f0 = max(1.0 / max(timeZoom, 0.000001), 0.000001)
+                if ev.type == .scrollWheel {
+                    let dx = ev.scrollingDeltaX
+                    let dy = ev.scrollingDeltaY
+                    if abs(dx) > abs(dy) {
+                        // Pan horizontally by dx
+                        let deltaRel = -CGFloat(dx) / max(overlayWidth, 1)
+                        let newStart = clamp(timeStart + deltaRel * f0, 0, 1 - f0)
+                        timeStart = newStart
+                        return nil
+                    } else {
+                        // Zoom vertically by dy around cursor
+                        var z = timeZoom * pow(1.08, dy / 10.0)
+                        z = max(1.0, min(64.0, z))
+                        let f1 = max(1.0 / max(z, 0.000001), 0.000001)
+                        let rel = clamp(cursorRelX, 0, 1)
+                        let centerAbs = timeStart + f0 * rel
+                        var newStart = centerAbs - f1 * rel
+                        newStart = clamp(newStart, 0, 1 - f1)
+                        timeZoom = z
+                        timeStart = newStart
+                        return nil
+                    }
+                } else if ev.type == .magnify {
+                    var z = timeZoom * (1.0 + ev.magnification)
+                    z = max(1.0, min(64.0, z))
+                    let f1 = max(1.0 / max(z, 0.000001), 0.000001)
+                    let rel = clamp(cursorRelX, 0, 1)
+                    let centerAbs = timeStart + f0 * rel
+                    var newStart = centerAbs - f1 * rel
+                    newStart = clamp(newStart, 0, 1 - f1)
+                    timeZoom = z
+                    timeStart = newStart
+                    return nil
+                }
+                return ev
+            }
             #endif
         }
         .onDisappear {
             #if os(macOS)
             if let m = keyMonitor { NSEvent.removeMonitor(m); keyMonitor = nil }
+            if let e = eventMonitor { NSEvent.removeMonitor(e); eventMonitor = nil }
             #endif
         }
         .onReceive(NotificationCenter.default.publisher(for: playPauseNotification)) { _ in
@@ -219,6 +340,18 @@ struct ContentView: View {
     @State private var playheadProgress: Double = 0 // 0..1
     @State private var peakHoldDB: Double? = nil
 
+    // Time navigation state (horizontal zoom and pan)
+    @State private var timeZoom: CGFloat = 1.0
+    @State private var timeStart: CGFloat = 0.0
+    @State private var panStartSnapshot: CGFloat = 0.0
+    @State private var isPanning: Bool = false
+    @State private var zoomStartSnapshot: CGFloat = 1.0
+    @State private var isZooming: Bool = false
+    @State private var cursorRelX: CGFloat = 0.5
+    @State private var zoomCenterRelSnapshot: CGFloat = 0.5
+    @State private var cursorInsideWaveform: Bool = false
+    @State private var overlayWidth: CGFloat = 1.0
+
     // Simple audio playback (AVAudioPlayer) synchronized to playhead
     @State private var audioPlayer: AVAudioPlayer?
 
@@ -254,6 +387,9 @@ struct ContentView: View {
     }
 
     private var playPauseNotification: Notification.Name { Notification.Name("AAVPlayPauseToggle") }
+
+    // Helpers
+    private func clamp(_ x: CGFloat, _ a: CGFloat, _ b: CGFloat) -> CGFloat { max(a, min(b, x)) }
 }
 
 #if os(macOS)

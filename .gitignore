@@ -1,0 +1,25 @@
+# macOS / Xcode
+.DS_Store
+/build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.moved-aside
+
+# SwiftPM
+.swiftpm/
+.build/
+
+# Logs
+*.log
+
+# Python virtual envs and caches
+python/.venv/
+venv/
+**/__pycache__/
+*.pyc
+
+# Misc
+*.swp
+*.swo

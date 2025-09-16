@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AVFoundation
 
 struct WaveformView: View {
     let samplesDB: [Double] // negative dBFS values
@@ -14,6 +15,17 @@ struct WaveformView: View {
     var amplitudeScale: CGFloat = 1.0 // visual vertical zoom
     var timeZoom: CGFloat = 1.0       // horizontal zoom factor (1 = full track)
     var timeStart: CGFloat = 0.0      // normalized left edge [0, 1 - 1/timeZoom]
+
+    // For high-zoom true waveform rendering
+    var duration: Double = 0
+    var sampleRate: Double = 44100
+    var audioURL: URL? = nil
+    var hiResThresholdSec: Double = 0.15 // when visible window <= threshold, draw raw waveform
+
+    @State private var viewWidth: CGFloat = 0
+    @State private var hiResSamples: [Float] = []
+    @State private var hiResWindow: (startTime: Double, duration: Double)? = nil
+    @State private var hiResLoading = false
 
     private func amplitude(from dB: Double) -> CGFloat {
         let linear = pow(10.0, dB / 20.0)
@@ -31,6 +43,9 @@ struct WaveformView: View {
             let iStart = Int(floor(Double(n) * Double(startNorm)))
             let iEnd = Int(ceil(Double(n) * Double(endNorm)))
             let visibleCount = max(1, iEnd - iStart)
+
+            let visibleDuration = Double(f) * max(duration, 0.0)
+            let shouldDrawHiRes = (audioURL != nil && visibleDuration > 0 && visibleDuration <= hiResThresholdSec && w > 0)
 
             Canvas { context, size in
                 if showGrid {
@@ -51,9 +66,25 @@ struct WaveformView: View {
                     }
                 }
 
-                // Build a detailed filled waveform silhouette using per-pixel min/max aggregation
-                let widthInt = max(1, Int(w.rounded(.down)))
-                if widthInt > 0 && iStart < iEnd {
+                // If very high zoom and we have hi-res samples for the current window, draw polyline of the waveform
+                if shouldDrawHiRes, let win = hiResWindow, !hiResSamples.isEmpty,
+                   abs(win.startTime - (Double(startNorm) * duration)) < 1e-3 && abs(win.duration - visibleDuration) < 1e-3 {
+                    let count = hiResSamples.count
+                    if count > 1 {
+                        var path = Path()
+                        let halfH = h / 2.0
+                        let scaleY = halfH
+                        for i in 0..<count {
+                            let x = CGFloat(i) / CGFloat(count - 1) * w
+                            let y = halfH - CGFloat(hiResSamples[i]) * amplitudeScale * scaleY
+                            if i == 0 { path.move(to: CGPoint(x: x, y: y)) } else { path.addLine(to: CGPoint(x: x, y: y)) }
+                        }
+                        context.stroke(path, with: .color(lineColor.opacity(0.98)), style: StrokeStyle(lineWidth: 1.4, lineCap: .round, lineJoin: .round))
+                    }
+                } else {
+                    // Build a detailed filled waveform silhouette using per-pixel min/max aggregation
+                    let widthInt = max(1, Int(w.rounded(.down)))
+                    if widthInt > 0 && iStart < iEnd {
                     var minAmp = Array(repeating: CGFloat(1.0), count: widthInt)
                     var maxAmp = Array(repeating: CGFloat(0.0), count: widthInt)
 
@@ -104,8 +135,103 @@ struct WaveformView: View {
                         context.stroke(outline, with: .color(lineColor.opacity(0.9)), lineWidth: 1)
                     }
                 }
+                }
             }
+            .background(
+                Color.clear
+                    .onAppear {
+                        viewWidth = w
+                        requestHiResIfNeeded(width: w, visibleDuration: visibleDuration, startNorm: startNorm)
+                    }
+                    .onChange(of: geo.size.width) { newW in
+                        viewWidth = newW
+                        requestHiResIfNeeded(width: newW, visibleDuration: visibleDuration, startNorm: startNorm)
+                    }
+                    .onChange(of: timeZoom) { _ in
+                        requestHiResIfNeeded(width: w, visibleDuration: visibleDuration, startNorm: startNorm)
+                    }
+                    .onChange(of: timeStart) { _ in
+                        requestHiResIfNeeded(width: w, visibleDuration: visibleDuration, startNorm: startNorm)
+                    }
+            )
         }
         .accessibilityLabel("Waveform")
+    }
+
+    private func requestHiResIfNeeded(width: CGFloat, visibleDuration: Double, startNorm: CGFloat) {
+        guard let url = audioURL, visibleDuration > 0, visibleDuration <= hiResThresholdSec, width > 0 else {
+            // Clear if not in hi-res mode
+            if !hiResSamples.isEmpty { hiResSamples = [] }
+            hiResWindow = nil
+            return
+        }
+        if hiResLoading { return }
+        let startTimeSec = Double(startNorm) * duration
+        // If we already have matching window, skip
+        if let win = hiResWindow, abs(win.startTime - startTimeSec) < 1e-3 && abs(win.duration - visibleDuration) < 1e-3 {
+            return
+        }
+        hiResLoading = true
+        Task.detached(priority: .userInitiated) {
+            let sr = max(1.0, sampleRate)
+            let startFrame = max(Int64(startTimeSec * sr), 0)
+            let framesToRead = max(Int64(visibleDuration * sr), 1)
+            do {
+                let file = try AVAudioFile(forReading: url)
+                let fmt = file.processingFormat
+                let channels = Int(fmt.channelCount)
+                file.framePosition = startFrame
+                let cap = AVAudioFrameCount(framesToRead)
+                guard let buf = AVAudioPCMBuffer(pcmFormat: fmt, frameCapacity: cap) else {
+                    await MainActor.run { self.hiResLoading = false }
+                    return
+                }
+                try file.read(into: buf, frameCount: cap)
+                let frames = Int(buf.frameLength)
+                guard frames > 1, let data = buf.floatChannelData else {
+                    await MainActor.run { self.hiResLoading = false }
+                    return
+                }
+                // Mixdown to mono
+                var mono = Array(repeating: Float(0), count: frames)
+                for ch in 0..<channels {
+                    let ptr = data[ch]
+                    for i in 0..<frames { mono[i] += ptr[i] }
+                }
+                if channels > 0 {
+                    let inv = 1.0 / Float(channels)
+                    for i in 0..<frames { mono[i] *= inv }
+                }
+                // Resample to at least 2 samples per pixel with linear interpolation (for a smooth line)
+                let targetPts = min(frames, max(4, Int(width) * 2))
+                var samplesOut: [Float] = Array(repeating: 0, count: targetPts)
+                if frames <= targetPts {
+                    // Pad/trim to target
+                    for i in 0..<targetPts { samplesOut[i] = mono[min(i, frames - 1)] }
+                } else {
+                    let step = Double(frames - 1) / Double(targetPts - 1)
+                    for k in 0..<targetPts {
+                        let pos = Double(k) * step
+                        let i0 = Int(pos.rounded(.down))
+                        let i1 = min(frames - 1, i0 + 1)
+                        let frac = Float(pos - Double(i0))
+                        let v0 = mono[i0]
+                        let v1 = mono[i1]
+                        samplesOut[k] = v0 + (v1 - v0) * frac
+                    }
+                }
+                await MainActor.run {
+                    self.hiResSamples = samplesOut
+                    self.hiResWindow = (startTime: startTimeSec, duration: visibleDuration)
+                    self.hiResLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.hiResSamples = []
+                    self.hiResWindow = nil
+                    self.hiResLoading = false
+                }
+            }
+        }
     }
 }

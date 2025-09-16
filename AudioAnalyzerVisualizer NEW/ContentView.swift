@@ -69,7 +69,17 @@ Text(String(format: "Середній рівень: %.1f dBFS", res.averageRMSdB
                                         RoundedRectangle(cornerRadius: 8)
                                             .fill(LinearGradient(colors: [Color.black.opacity(0.03), Color.black.opacity(0.06)], startPoint: .top, endPoint: .bottom))
                                             HStack(spacing: 6) {
-                                                WaveformView(samplesDB: res.windowRMSdB, lineColor: .accentColor, showGrid: true, amplitudeScale: amplitudeScale, timeZoom: timeZoom, timeStart: timeStart)
+                                                WaveformView(
+                                                    samplesDB: res.windowRMSdB,
+                                                    lineColor: .accentColor,
+                                                    showGrid: true,
+                                                    amplitudeScale: amplitudeScale,
+                                                    timeZoom: timeZoom,
+                                                    timeStart: timeStart,
+                                                    duration: res.duration,
+                                                    sampleRate: res.sampleRate,
+                                                    audioURL: doc.url
+                                                )
                                                     .padding(.vertical, 8)
                                                     .padding(.horizontal, 4)
                                                     .overlay(
@@ -121,16 +131,25 @@ GeometryReader { geo in
                                                         .allowsHitTesting(false)
                                                         #endif
 
-                                                        Color.clear
-                                                            .contentShape(Rectangle())
-                                                            .gesture(DragGesture(minimumDistance: 0).onEnded { v in
-                                                                let localX = max(0, min(v.location.x, geo.size.width))
-                                                                let f = max(1.0 / max(timeZoom, 0.000001), 0.000001)
-                                                                let rel = localX / max(geo.size.width, 0.000001)
-                                                                let progress = max(0, min(1, timeStart + f * rel))
-                                                                playheadProgress = progress
-                                                                audioPlayer?.currentTime = res.duration * progress
-                                                            })
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .gesture(DragGesture(minimumDistance: 0).onEnded { v in
+                            let localX = max(0, min(v.location.x, geo.size.width))
+                            let f = max(1.0 / max(timeZoom, 0.000001), 0.000001)
+                            let rel = localX / max(geo.size.width, 0.000001)
+                            let progress = max(0, min(1, timeStart + f * rel))
+                            playheadProgress = progress
+                            // Persist playhead immediately
+                            if let sel = model.selectedDocID {
+                                model.updateState(for: sel) { s in s.playheadProgress = progress }
+                            }
+                            audioPlayer?.currentTime = res.duration * progress
+                        })
+                        #if os(macOS)
+                        .onHover { inside in
+                            cursorInsideWaveform = inside
+                        }
+                        #endif
                                                         // Horizontal pan (drag gesture)
                                                         .simultaneousGesture(DragGesture(minimumDistance: 2).onChanged { v in
                                                             let f = max(1.0 / max(timeZoom, 0.000001), 0.000001)
@@ -209,6 +228,15 @@ GeometryReader { geo in
         }
         .padding()
         .onAppear {
+            // Restore per-doc view state when content appears
+            if let sel = model.selectedDocID {
+                let s = model.state(for: sel)
+                self.timeZoom = s.timeZoom
+                self.timeStart = s.timeStart
+                self.amplitudeScale = s.amplitudeScale
+                self.playheadProgress = s.playheadProgress
+                self.lastSelectedID = sel
+            }
             #if os(macOS)
             keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                 if event.keyCode == 49 && event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty {
@@ -218,7 +246,10 @@ GeometryReader { geo in
                 return event
             }
             eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .magnify]) { ev in
+                // Only handle gestures when mouse is over the waveform overlay area
                 guard cursorInsideWaveform else { return ev }
+                // Also require the event's window to be our frontmost app window to avoid global capture
+                guard NSApplication.shared.isActive else { return ev }
                 let f0 = max(1.0 / max(timeZoom, 0.000001), 0.000001)
                 if ev.type == .scrollWheel {
                     let dx = ev.scrollingDeltaX
@@ -258,7 +289,41 @@ GeometryReader { geo in
             }
             #endif
         }
+        .onChange(of: model.selectedDocID) { newID in
+            // Pause any current playback when switching files
+            if isPlaying { audioPlayer?.pause(); isPlaying = false }
+            // Persist state of previous selection
+            if let prev = lastSelectedID {
+                model.updateState(for: prev) { s in
+                    s.timeZoom = self.timeZoom
+                    s.timeStart = self.timeStart
+                    s.amplitudeScale = self.amplitudeScale
+                    s.playheadProgress = self.playheadProgress
+                }
+            }
+            // Restore state of new selection
+            if let id = newID {
+                let s = model.state(for: id)
+                self.timeZoom = s.timeZoom
+                self.timeStart = s.timeStart
+                self.amplitudeScale = s.amplitudeScale
+                self.playheadProgress = s.playheadProgress
+                self.lastSelectedID = id
+                // Seek player position to this doc's playhead if same audio is loaded
+                if let doc = model.docs.first(where: { $0.id == id }), let res = doc.result {
+                    if audioPlayer?.url == doc.url { audioPlayer?.currentTime = currentTime(res: res) }
+                }
+            }
+        }
         .onDisappear {
+            // Persist current state into model
+            if let sel = model.selectedDocID {
+                model.updateState(for: sel) { s in
+                    s.timeZoom = self.timeZoom
+                    s.timeStart = self.timeStart
+                    s.amplitudeScale = self.amplitudeScale
+                }
+            }
             #if os(macOS)
             if let m = keyMonitor { NSEvent.removeMonitor(m); keyMonitor = nil }
             if let e = eventMonitor { NSEvent.removeMonitor(e); eventMonitor = nil }
@@ -267,6 +332,12 @@ GeometryReader { geo in
         .onReceive(NotificationCenter.default.publisher(for: playPauseNotification)) { _ in
             // Toggle play/pause and manage AVAudioPlayer
             guard let sel = model.selectedDocID, let doc = model.docs.first(where: { $0.id == sel }) else { return }
+            // Persist state for current doc on interaction
+            model.updateState(for: sel) { s in
+                s.timeZoom = self.timeZoom
+                s.timeStart = self.timeStart
+                s.amplitudeScale = self.amplitudeScale
+            }
             let url = doc.url.resolvingSymlinksInPath()
             if audioPlayer == nil || audioPlayer?.url != url {
                 audioPlayer = try? AVAudioPlayer(contentsOf: url)
@@ -278,18 +349,29 @@ GeometryReader { geo in
                 audioPlayer?.pause()
                 isPlaying = false
             } else {
+                // Always start from playhead position
+                if let res = doc.result {
+                    audioPlayer?.currentTime = currentTime(res: res)
+                }
                 audioPlayer?.play()
                 isPlaying = true
             }
         }
         .onReceive(Timer.publish(every: 0.016, on: .main, in: .common).autoconnect()) { _ in
             // Advance playhead either by timer or bind to audioPlayer time
-            guard let res = model.docs.first(where: { $0.id == model.selectedDocID })?.result else { return }
+            guard let sel = model.selectedDocID, let doc = model.docs.first(where: { $0.id == sel }), let res = doc.result else { return }
             if let p = audioPlayer, p.isPlaying {
                 playheadProgress = min(1.0, p.currentTime / max(res.duration, 0.000001))
             } else if isPlaying {
                 let step = max(0.000001, 0.016 / max(res.duration, 0.000001))
                 playheadProgress = min(1.0, playheadProgress + step)
+            }
+            // Persist state periodically while doc is visible
+            model.updateState(for: sel) { s in
+                s.timeZoom = self.timeZoom
+                s.timeStart = self.timeStart
+                s.amplitudeScale = self.amplitudeScale
+                s.playheadProgress = self.playheadProgress
             }
             if let cur = currentDB(res: res) {
                 if let peak = peakHoldDB {
@@ -337,12 +419,13 @@ GeometryReader { geo in
     }
     #endif
     // MARK: - UI helpers and state
+    // Per-doc view state cache (backed by model.viewStates)
     @State private var amplitudeScale: CGFloat = 1.0
     @State private var isPlaying: Bool = false
     @State private var playheadProgress: Double = 0 // 0..1
     @State private var peakHoldDB: Double? = nil
 
-    // Time navigation state (horizontal zoom and pan)
+    // Time navigation state (horizontal zoom and pan) — kept per selected doc
     @State private var timeZoom: CGFloat = 1.0
     @State private var timeStart: CGFloat = 0.0
     @State private var panStartSnapshot: CGFloat = 0.0
@@ -353,6 +436,7 @@ GeometryReader { geo in
     @State private var zoomCenterRelSnapshot: CGFloat = 0.5
     @State private var cursorInsideWaveform: Bool = false
     @State private var overlayWidth: CGFloat = 1.0
+    @State private var lastSelectedID: UUID? = nil
 
     // Simple audio playback (AVAudioPlayer) synchronized to playhead
     @State private var audioPlayer: AVAudioPlayer?

@@ -11,10 +11,28 @@ final class AppModel: ObservableObject {
         var errorMessage: String?
     }
 
+    struct ViewState: Equatable {
+        var timeZoom: CGFloat = 1.0
+        var timeStart: CGFloat = 0.0
+        var amplitudeScale: CGFloat = 1.0
+        var playheadProgress: Double = 0.0 // 0..1
+    }
+
     @Published var docs: [Doc] = []
     @Published var selectedDocID: UUID?
+    @Published var viewStates: [UUID: ViewState] = [:]
 
     let allowedExtensions = ["wav", "aiff", "aif", "caf", "m4a", "mp3"]
+
+    func state(for id: UUID) -> ViewState { viewStates[id] ?? ViewState() }
+    @MainActor
+    func setState(for id: UUID, _ s: ViewState) { viewStates[id] = s }
+    @MainActor
+    func updateState(for id: UUID, _ mutate: (inout ViewState) -> Void) {
+        var s = viewStates[id] ?? ViewState()
+        mutate(&s)
+        viewStates[id] = s
+    }
 
     func addFiles(urls: [URL]) {
         var newDocs: [Doc] = []
@@ -22,7 +40,9 @@ final class AppModel: ObservableObject {
         for url in urls {
             let ext = url.pathExtension.lowercased()
             guard allowedExtensions.contains(ext), !existing.contains(url) else { continue }
-            newDocs.append(Doc(url: url))
+            let d = Doc(url: url)
+            newDocs.append(d)
+            viewStates[d.id] = ViewState()
         }
         guard !newDocs.isEmpty else { return }
         docs.append(contentsOf: newDocs)
@@ -38,6 +58,7 @@ final class AppModel: ObservableObject {
     func clearAll() {
         docs.removeAll()
         selectedDocID = nil
+        viewStates.removeAll()
     }
 
     func analyzeCurrent() async {
@@ -79,6 +100,7 @@ final class AppModel: ObservableObject {
     func closeDoc(id: UUID) {
         if let idx = docs.firstIndex(where: { $0.id == id }) {
             docs.remove(at: idx)
+            viewStates[id] = nil
             if selectedDocID == id {
                 selectedDocID = docs.first?.id
             }

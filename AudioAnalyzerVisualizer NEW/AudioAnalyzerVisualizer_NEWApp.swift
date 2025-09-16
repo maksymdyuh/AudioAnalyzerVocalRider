@@ -16,10 +16,14 @@ struct AudioAnalyzerVisualizer_NEWApp: App {
             Group {
                 if model.docs.isEmpty {
                     StartView()
+                } else if model.docs.contains(where: { $0.isAnalyzing || ($0.result == nil && $0.errorMessage == nil) }) {
+                    LoadingView()
                 } else {
                     ContentView()
                 }
             }
+            .animation(.easeInOut(duration: 0.2), value: model.docs.map { ($0.id, $0.isAnalyzing, $0.result?.duration ?? 0) }.description)
+            .transition(.opacity)
             .environmentObject(model)
         }
         .defaultSize(width: 1100, height: 820)

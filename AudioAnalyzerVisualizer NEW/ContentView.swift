@@ -68,11 +68,11 @@ Text(String(format: "Середній рівень: %.1f dBFS", res.averageRMSdB
                                     ZStack {
                                         RoundedRectangle(cornerRadius: 8)
                                             .fill(LinearGradient(colors: [Color.black.opacity(0.03), Color.black.opacity(0.06)], startPoint: .top, endPoint: .bottom))
-                                        HStack(spacing: 6) {
-                                            WaveformView(samplesDB: res.windowRMSdB, lineColor: .accentColor, showGrid: true, amplitudeScale: amplitudeScale, timeZoom: timeZoom, timeStart: timeStart)
-                                                .padding(.vertical, 8)
-                                                .padding(.horizontal, 4)
-                                                .overlay(
+                                            HStack(spacing: 6) {
+                                                WaveformView(samplesDB: res.windowRMSdB, lineColor: .accentColor, showGrid: true, amplitudeScale: amplitudeScale, timeZoom: timeZoom, timeStart: timeStart)
+                                                    .padding(.vertical, 8)
+                                                    .padding(.horizontal, 4)
+                                                    .overlay(
 GeometryReader { geo in
                                                     ZStack(alignment: .topLeading) {
                                                         // Keep overlayWidth updated
@@ -172,14 +172,15 @@ GeometryReader { geo in
                                             VStack {
                                                 Slider(value: $amplitudeScale, in: 0.5...5.0)
                                                     .rotationEffect(.degrees(-90))
-                                                    .frame(height: meterHeight)
+                                                    .frame(maxHeight: .infinity)
                                                     .scaleEffect(1.4)
                                                     .padding(.horizontal, 4)
                                             }
                                             .frame(width: 56)
 
                                             GainMeterView(currentDB: currentDB(res: res), peakHoldDB: peakHoldDB)
-                                                .frame(width: 26, height: meterHeight)
+                                                .frame(width: 26)
+                                                .frame(maxHeight: .infinity)
                                         }
                                     }
                                     .overlay(alignment: .topLeading) {
@@ -188,7 +189,8 @@ GeometryReader { geo in
                                             .foregroundStyle(.secondary)
                                             .padding(6)
                                     }
-.frame(height: meterHeight + 20)
+                                    .frame(minHeight: meterMinHeight)
+                                    .frame(maxHeight: .infinity)
                                 }
                             }
                         } else if doc.isAnalyzing {
@@ -356,7 +358,8 @@ GeometryReader { geo in
     @State private var audioPlayer: AVAudioPlayer?
 
     // Sizing
-    private let meterHeight: CGFloat = 300
+    // Height grows with window; this is a preferred minimum, not a fixed value
+    private let meterMinHeight: CGFloat = 240
 
     private func metaLine(result: AnalysisResult, url: URL) -> String {
         var parts: [String] = []

@@ -31,7 +31,6 @@ struct WaveformView: View {
             let iStart = Int(floor(Double(n) * Double(startNorm)))
             let iEnd = Int(ceil(Double(n) * Double(endNorm)))
             let visibleCount = max(1, iEnd - iStart)
-            let step = w / CGFloat(visibleCount)
 
             Canvas { context, size in
                 if showGrid {
@@ -41,35 +40,70 @@ struct WaveformView: View {
                     center.addLine(to: CGPoint(x: w, y: h / 2))
                     context.stroke(center, with: .color(.gray.opacity(0.4)), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
 
-                    // Vertical grid lines (time)
-                    let columns = 10
+                    // Subtle vertical guides (fixed columns as a background reference)
+                    let columns = 8
                     for i in 0...columns {
                         let x = CGFloat(i) * w / CGFloat(columns)
                         var g = Path()
                         g.move(to: CGPoint(x: x, y: 0))
                         g.addLine(to: CGPoint(x: x, y: h))
-                        context.stroke(g, with: .color(.gray.opacity(0.15)), lineWidth: 1)
+                        context.stroke(g, with: .color(.gray.opacity(0.12)), lineWidth: 1)
                     }
-
                 }
 
-                // Waveform for visible range only
-                var path = Path()
-                if iStart < iEnd {
+                // Build a detailed filled waveform silhouette using per-pixel min/max aggregation
+                let widthInt = max(1, Int(w.rounded(.down)))
+                if widthInt > 0 && iStart < iEnd {
+                    var minAmp = Array(repeating: CGFloat(1.0), count: widthInt)
+                    var maxAmp = Array(repeating: CGFloat(0.0), count: widthInt)
+
+                    let denom = max(CGFloat(visibleCount - 1), 1)
+                    let halfH = h / 2.0
+
                     for i in iStart..<iEnd {
                         let idx = i
                         if idx < samplesDB.count {
-                            let x = CGFloat(i - iStart) * step
-                            let amp = amplitude(from: samplesDB[idx])
-                            let lineHeight = min(h/2.0, amp * amplitudeScale * (h / 2.0))
-                            let yTop = (h / 2.0) - lineHeight
-                            let yBottom = (h / 2.0) + lineHeight
-                            path.move(to: CGPoint(x: x, y: yTop))
-                            path.addLine(to: CGPoint(x: x, y: yBottom))
+                            let amp = min(1.0, amplitude(from: samplesDB[idx]) * amplitudeScale)
+                            let xf = (CGFloat(i - iStart) / denom) * max(w - 1, 1)
+                            let bx = min(widthInt - 1, max(0, Int(xf)))
+                            minAmp[bx] = min(minAmp[bx], amp)
+                            maxAmp[bx] = max(maxAmp[bx], amp)
                         }
                     }
+
+                    var polygon = Path()
+                    var topPoints: [CGPoint] = []
+                    var bottomPoints: [CGPoint] = []
+
+                    for x in 0..<widthInt {
+                        let a = maxAmp[x]
+                        if a > 0 { // valid bucket
+                            let cx = CGFloat(x) + 0.5
+                            let yTop = halfH - a * halfH
+                            let yBottom = halfH + a * halfH
+                            topPoints.append(CGPoint(x: cx, y: yTop))
+                            bottomPoints.append(CGPoint(x: cx, y: yBottom))
+                        }
+                    }
+
+                    if let first = topPoints.first {
+                        polygon.move(to: first)
+                        for p in topPoints.dropFirst() { polygon.addLine(to: p) }
+                        for p in bottomPoints.reversed() { polygon.addLine(to: p) }
+                        polygon.closeSubpath()
+
+                        // Fill silhouette
+                        context.fill(polygon, with: .color(lineColor.opacity(0.35)))
+
+                        // Outline
+                        var outline = Path()
+                        outline.move(to: first)
+                        for p in topPoints.dropFirst() { outline.addLine(to: p) }
+                        for p in bottomPoints.reversed() { outline.addLine(to: p) }
+                        outline.closeSubpath()
+                        context.stroke(outline, with: .color(lineColor.opacity(0.9)), lineWidth: 1)
+                    }
                 }
-                context.stroke(path, with: .color(lineColor), lineWidth: max(1, step * 0.85))
             }
         }
         .accessibilityLabel("Waveform")

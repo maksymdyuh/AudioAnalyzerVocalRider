@@ -59,7 +59,7 @@ struct StartView: View {
             .padding(.top, 8)
 
             #if os(macOS)
-            StartDropZone(title: model.docs.isEmpty ? "Або перетягніть аудіофайли сюди" : "Перетягніть, щоб додати ще файли",
+            StartDropZone(title: model.docs.isEmpty ? "Перетягніть аудіофайли сюди" : "Перетягніть, щоб додати ще файли",
                           isTargeted: $isTargeted) { providers in
                 handleDrop(providers)
             }

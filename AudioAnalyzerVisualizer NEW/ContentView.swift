@@ -318,7 +318,7 @@ GeometryReader { geo in
         }
         .onChange(of: model.selectedDocID) { newID in
             // Pause any current playback when switching files
-            if isPlaying { audioPlayer.pause(); isPlaying = false }
+            if audioPlayer.isPlaying { audioPlayer.pause() }
             // Persist state of previous selection
             if let prev = lastSelectedID {
                 model.updateState(for: prev) { s in
@@ -388,16 +388,14 @@ GeometryReader { geo in
                 }
             }
             
-            if isPlaying {
+            if audioPlayer.isPlaying {
                 audioPlayer.pause()
-                isPlaying = false
             } else {
-                // Always start from playhead position
+                // start playing
                 if let res = doc.result {
                     audioPlayer.seek(to: currentTime(res: res))
                 }
                 audioPlayer.play(from: audioPlayer.currentTime)
-                isPlaying = true
             }
         }
         .onReceive(Timer.publish(every: 0.016, on: .main, in: .common).autoconnect()) { _ in
@@ -405,9 +403,6 @@ GeometryReader { geo in
             guard let sel = model.selectedDocID, let doc = model.docs.first(where: { $0.id == sel }), let res = doc.result else { return }
             if audioPlayer.isPlaying {
                 playheadProgress = min(1.0, audioPlayer.currentTime / max(res.duration, 0.000001))
-            } else if isPlaying {
-                let step = max(0.000001, 0.016 / max(res.duration, 0.000001))
-                playheadProgress = min(1.0, playheadProgress + step)
             }
             // Persist state periodically while doc is visible
             model.updateState(for: sel) { s in
@@ -424,7 +419,7 @@ GeometryReader { geo in
                     peakHoldDB = cur
                 }
             }
-            if playheadProgress >= 1.0 { isPlaying = false }
+            if playheadProgress >= 1.0 && audioPlayer.isPlaying { audioPlayer.stop() }
         }
     }
 
@@ -465,7 +460,6 @@ GeometryReader { geo in
     // MARK: - UI helpers and state
     // Per-doc view state cache (backed by model.viewStates)
     @State private var amplitudeScale: CGFloat = 1.0
-    @State private var isPlaying: Bool = false
     @State private var playheadProgress: Double = 0 // 0..1
     @State private var peakHoldDB: Double? = nil
     @State private var riderAmount: Double = 0.0 // Додав нову ручку (слайдер) для Vocal Rider

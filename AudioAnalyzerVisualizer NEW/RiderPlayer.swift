@@ -16,12 +16,15 @@ class RiderPlayer: ObservableObject {
     var url: URL?
     
     private var audioFile: AVAudioFile?
-    private var displayLink: CVDisplayLink?
+    private var playbackTimer: Timer?
     
     // Стан Vocal Rider
     var suggestedGain: [Double]?
     var windowMs: Double = 20.0
     var riderAmount: Double = 0.0
+    
+    // Щоб уникати хибних зупинок при перемотуванні (seek)
+    private var playSessionID = UUID()
     
     // Щоб знати точний час програвання
     private var baseTime: Double = 0.0
@@ -33,8 +36,6 @@ class RiderPlayer: ObservableObject {
         // З'єднуємо вузли (player -> mixer -> main out)
         engine.connect(playerNode, to: mixerNode, format: nil)
         engine.connect(mixerNode, to: engine.mainMixerNode, format: nil)
-        
-        setupDisplayLink()
     }
     
     func load(url: URL) {
@@ -64,32 +65,36 @@ class RiderPlayer: ObservableObject {
         
         if framesCount > 0 {
             playerNode.stop()
+            let currentSessionId = UUID()
+            self.playSessionID = currentSessionId
+            
             // Плануємо шматок файлу
             playerNode.scheduleSegment(file, startingFrame: startFrame, frameCount: framesCount, at: nil) {
                 // Викликається після завершення
                 DispatchQueue.main.async { [weak self] in
-                    self?.isPlaying = false
-                    self?.pauseDisplayLink()
+                    guard let self = self, self.playSessionID == currentSessionId else { return }
+                    self.isPlaying = false
+                    self.stopTimer()
                 }
             }
             baseTime = time
             playerNode.play()
             self.currentTime = time
             isPlaying = true
-            resumeDisplayLink()
+            startTimer()
         }
     }
     
     func pause() {
         playerNode.pause()
         isPlaying = false
-        pauseDisplayLink()
+        stopTimer()
     }
     
     func stop() {
         playerNode.stop()
         isPlaying = false
-        pauseDisplayLink()
+        stopTimer()
         currentTime = 0.0
     }
     
@@ -102,27 +107,17 @@ class RiderPlayer: ObservableObject {
         }
     }
     
-    private func setupDisplayLink() {
-        CVDisplayLinkCreateWithActiveCGDisplays(&displayLink)
-        if let dl = displayLink {
-            let context = Unmanaged.passUnretained(self).toOpaque()
-            // Цей колбек викликається синхронно з частотою монітору (зазвичай 60 FPS)
-            CVDisplayLinkSetOutputCallback(dl, { (_, _, _, _, _, context) -> CVReturn in
-                if let ctx = context {
-                    let player = Unmanaged<RiderPlayer>.fromOpaque(ctx).takeUnretainedValue()
-                    player.updateRealtime()
-                }
-                return kCVReturnSuccess
-            }, context)
+    private func startTimer() {
+        stopTimer()
+        playbackTimer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { [weak self] _ in
+            self?.updateRealtime()
         }
+        RunLoop.main.add(playbackTimer!, forMode: .common)
     }
     
-    private func resumeDisplayLink() {
-        if let dl = displayLink { CVDisplayLinkStart(dl) }
-    }
-    
-    private func pauseDisplayLink() {
-        if let dl = displayLink { CVDisplayLinkStop(dl) }
+    private func stopTimer() {
+        playbackTimer?.invalidate()
+        playbackTimer = nil
     }
     
     // 🎚️ Магія Vocal Rider, що крутить "ручку гучності" кожну мілісекунду
@@ -133,10 +128,7 @@ class RiderPlayer: ObservableObject {
         let sampleRate = playerTime.sampleRate
         let fileTime = baseTime + Double(playerTime.sampleTime) / sampleRate
         
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            self.currentTime = fileTime
-        }
+        self.currentTime = fileTime
         
         // Обчислення нового Gain (гучності) на основі нашої кривої Vocal Rider
         if let gainEnv = suggestedGain, !gainEnv.isEmpty {

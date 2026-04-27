@@ -78,6 +78,8 @@ Text(String(format: "Середній рівень: %.1f dBFS", res.averageRMSdB
                                                 if let sel = model.selectedDocID {
                                                     model.updateState(for: sel) { $0.riderAmount = newVal }
                                                 }
+                                                // Оновлюємо гучність відтворення в реальному часі
+                                                audioPlayer.riderAmount = newVal
                                             }
                                         ), in: 0...1)
                                         .frame(width: 150)
@@ -167,7 +169,7 @@ GeometryReader { geo in
                             if let sel = model.selectedDocID {
                                 model.updateState(for: sel) { s in s.playheadProgress = progress }
                             }
-                            audioPlayer?.currentTime = res.duration * progress
+                            audioPlayer.seek(to: res.duration * progress)
                         })
                         #if os(macOS)
                         .onHover { inside in
@@ -316,7 +318,7 @@ GeometryReader { geo in
         }
         .onChange(of: model.selectedDocID) { newID in
             // Pause any current playback when switching files
-            if isPlaying { audioPlayer?.pause(); isPlaying = false }
+            if isPlaying { audioPlayer.pause(); isPlaying = false }
             // Persist state of previous selection
             if let prev = lastSelectedID {
                 model.updateState(for: prev) { s in
@@ -338,7 +340,7 @@ GeometryReader { geo in
                 self.lastSelectedID = id
                 // Seek player position to this doc's playhead if same audio is loaded
                 if let doc = model.docs.first(where: { $0.id == id }), let res = doc.result {
-                    if audioPlayer?.url == doc.url { audioPlayer?.currentTime = currentTime(res: res) }
+                    if audioPlayer.url == doc.url { audioPlayer.seek(to: currentTime(res: res)) }
                 }
             }
         }
@@ -368,29 +370,41 @@ GeometryReader { geo in
                 s.riderAmount = self.riderAmount
             }
             let url = doc.url.resolvingSymlinksInPath()
-            if audioPlayer == nil || audioPlayer?.url != url {
-                audioPlayer = try? AVAudioPlayer(contentsOf: url)
-                audioPlayer?.prepareToPlay()
-                // Seek audio to current time
-                if let res = doc.result { audioPlayer?.currentTime = currentTime(res: res) }
+            if audioPlayer.url != url {
+                audioPlayer.load(url: url)
+                audioPlayer.prepareToPlay()
+                // Передаємо в плеєр дані Vocal Rider:
+                if let res = doc.result { 
+                    audioPlayer.suggestedGain = res.suggestedGain
+                    audioPlayer.windowMs = Double(res.windowMs)
+                    audioPlayer.riderAmount = self.riderAmount
+                    audioPlayer.seek(to: currentTime(res: res)) 
+                }
+            } else {
+                if let res = doc.result {
+                    audioPlayer.suggestedGain = res.suggestedGain
+                    audioPlayer.windowMs = Double(res.windowMs)
+                    audioPlayer.riderAmount = self.riderAmount
+                }
             }
+            
             if isPlaying {
-                audioPlayer?.pause()
+                audioPlayer.pause()
                 isPlaying = false
             } else {
                 // Always start from playhead position
                 if let res = doc.result {
-                    audioPlayer?.currentTime = currentTime(res: res)
+                    audioPlayer.seek(to: currentTime(res: res))
                 }
-                audioPlayer?.play()
+                audioPlayer.play(from: audioPlayer.currentTime)
                 isPlaying = true
             }
         }
         .onReceive(Timer.publish(every: 0.016, on: .main, in: .common).autoconnect()) { _ in
             // Advance playhead either by timer or bind to audioPlayer time
             guard let sel = model.selectedDocID, let doc = model.docs.first(where: { $0.id == sel }), let res = doc.result else { return }
-            if let p = audioPlayer, p.isPlaying {
-                playheadProgress = min(1.0, p.currentTime / max(res.duration, 0.000001))
+            if audioPlayer.isPlaying {
+                playheadProgress = min(1.0, audioPlayer.currentTime / max(res.duration, 0.000001))
             } else if isPlaying {
                 let step = max(0.000001, 0.016 / max(res.duration, 0.000001))
                 playheadProgress = min(1.0, playheadProgress + step)
@@ -470,7 +484,7 @@ GeometryReader { geo in
     @State private var lastSelectedID: UUID? = nil
 
     // Simple audio playback (AVAudioPlayer) synchronized to playhead
-    @State private var audioPlayer: AVAudioPlayer?
+    @StateObject private var audioPlayer = RiderPlayer.shared
 
     // Sizing
     // Height grows with window; this is a preferred minimum, not a fixed value

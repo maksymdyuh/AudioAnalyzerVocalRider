@@ -402,7 +402,8 @@ GeometryReader { geo in
             // Advance playhead either by timer or bind to audioPlayer time
             guard let sel = model.selectedDocID, let doc = model.docs.first(where: { $0.id == sel }), let res = doc.result else { return }
             if audioPlayer.isPlaying {
-                playheadProgress = min(1.0, audioPlayer.currentTime / max(res.duration, 0.000001))
+                let actualCurrentTime = audioPlayer.currentTime
+                playheadProgress = min(1.0, actualCurrentTime / max(res.duration, 0.000001))
             }
             // Persist state periodically while doc is visible
             model.updateState(for: sel) { s in

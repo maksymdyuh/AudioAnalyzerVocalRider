@@ -176,8 +176,8 @@ struct WaveformView: View {
                     }
                     
                     if hasMoved {
-                        // Малюємо лінію гучності (наприклад, яскраво-жовтого кольору)
-                        context.stroke(gainPath, with: .color(.yellow), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                        // Робимо лінію автоматизації гучності дуже тонкою і напівпрозорою білою, як у Pro Tools
+                        context.stroke(gainPath, with: .color(.white.opacity(0.35)), style: StrokeStyle(lineWidth: 1.0, lineCap: .round, lineJoin: .round))
                     }
                 }
             }

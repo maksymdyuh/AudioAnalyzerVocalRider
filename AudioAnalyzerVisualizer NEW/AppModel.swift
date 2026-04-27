@@ -119,7 +119,7 @@ final class AppModel: ObservableObject {
         
         // --- Додаємо обчислення Vocal Rider (Clip Gain) ---
         let params = GainSuggester.Params(
-            targetDB: -18.0,       // Цільовий рівень
+            targetDB: r.averageRMSdB, // ДИНАМІЧНИЙ ЦІЛЬОВИЙ РІВЕНЬ: зводимо трек до його ж середньої гучності
             thresholdDB: -40.0,    // Не чіпати тишу (тільки шум)
             minGainDB: -12.0,      // Максимальне зменшення
             maxGainDB: 12.0,       // Максимальне підсилення

@@ -16,4 +16,5 @@ struct AnalysisResult: Codable, Equatable {
     // Optional metadata (filled by backend or at runtime)
     var bitDepth: Int?
     var bitrateKbps: Int?
+    var suggestedGain: [Double]? // Сюди ми зберігатимемо результат Vocal Rider
 }

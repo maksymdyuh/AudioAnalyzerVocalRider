@@ -3,58 +3,64 @@
 //  AudioAnalyzerVisualizer NEW
 //
 //  Computes a recommended clip gain envelope (dB) to steer windowed RMS toward a target.
+//  Implements a professional Vocal Rider algorithm with Gate Threshold, Attack, and Release.
 //
 
 import Foundation
 
 enum GainSuggester {
     struct Params {
-        var targetDB: Double = -18.0         // target loudness in dBFS
-        var minGainDB: Double = -12.0        // min allowed gain adjustment per window (dB)
-        var maxGainDB: Double = 12.0         // max allowed gain adjustment per window (dB)
-        var maxStepDB: Double = 1.0          // max change between adjacent windows (dB per window)
-        var smoothWindow: Int = 3            // moving average window (odd recommended)
+        var targetDB: Double = -18.0           // Target loudness in dBFS
+        var thresholdDB: Double = -40.0        // Noise gate threshold: ignore audio below this
+        var minGainDB: Double = -12.0          // Max attenuation (dB)
+        var maxGainDB: Double = 12.0           // Max boost (dB)
+        var attackMs: Double = 5.0             // Fast response when audio gets louder (fader down)
+        var releaseMs: Double = 100.0          // Slow response when audio gets quieter (fader up)
+        var windowMs: Double = 20.0            // Time elapsed per window element
     }
 
     static func suggest(windowRMSdB: [Double], params: Params) -> [Double] {
         guard !windowRMSdB.isEmpty else { return [] }
         let p = params
-        // Initial desired gain to hit target per window
-        let desired = windowRMSdB.map { clamp(p.targetDB - $0, p.minGainDB, p.maxGainDB) }
-        // Step-limit (slew) the gain to avoid abrupt changes
-        var stepped: [Double] = Array(repeating: 0, count: desired.count)
-        var prev = 0.0
-        for i in 0..<desired.count {
-            let aim = desired[i]
-            let delta = clamp(aim - prev, -p.maxStepDB, p.maxStepDB)
-            let next = prev + delta
-            stepped[i] = clamp(next, p.minGainDB, p.maxGainDB)
-            prev = stepped[i]
+        
+        // Calculate smoothing coefficients for a one-pole lowpass filter
+        // Formula for Alpha: exp(-dt / timeConstant)
+        let dt = p.windowMs
+        let alphaAttack = p.attackMs > 0 ? exp(-dt / p.attackMs) : 0.0
+        let alphaRelease = p.releaseMs > 0 ? exp(-dt / p.releaseMs) : 0.0
+        
+        var envelope: [Double] = Array(repeating: 0.0, count: windowRMSdB.count)
+        var currentGain = 0.0
+        
+        for i in 0..<windowRMSdB.count {
+            let rms = windowRMSdB[i]
+            var targetGain = 0.0
+            
+            // 1. Noise Gate Check: we only apply Rider to actual signal, not noise/breaths
+            if rms > p.thresholdDB {
+                targetGain = p.targetDB - rms
+                targetGain = clamp(targetGain, p.minGainDB, p.maxGainDB)
+            } else {
+                // Return fader to 0 (unity gain) when audio is silent
+                targetGain = 0.0
+            }
+            
+            // 2. Apply Smoothing (Envelope Following the Gain)
+            if targetGain < currentGain {
+                // Fader moving down (Attack phase - acting fast to reduce loud transients)
+                currentGain = alphaAttack * currentGain + (1.0 - alphaAttack) * targetGain
+            } else {
+                // Fader moving up (Release phase - acting slowly to boost quieter phrases gracefully)
+                currentGain = alphaRelease * currentGain + (1.0 - alphaRelease) * targetGain
+            }
+            
+            envelope[i] = currentGain
         }
-        // Optional moving-average smoothing
-        let k = max(1, p.smoothWindow)
-        if k <= 1 { return stepped }
-        return movingAverage(stepped, k)
+        
+        return envelope
     }
 
     private static func clamp(_ x: Double, _ a: Double, _ b: Double) -> Double {
         return max(a, min(b, x))
-    }
-
-    private static func movingAverage(_ x: [Double], _ w: Int) -> [Double] {
-        guard w > 1, !x.isEmpty else { return x }
-        var out = Array(repeating: 0.0, count: x.count)
-        var sum = 0.0
-        var q: [Double] = []
-        q.reserveCapacity(w)
-        for i in 0..<x.count {
-            sum += x[i]
-            q.append(x[i])
-            if q.count > w {
-                sum -= q.removeFirst()
-            }
-            out[i] = sum / Double(q.count)
-        }
-        return out
     }
 }

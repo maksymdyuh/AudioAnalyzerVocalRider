@@ -115,6 +115,20 @@ final class AppModel: ObservableObject {
             if r.bitDepth == nil { r.bitDepth = info.bitDepth }
             if r.bitrateKbps == nil { r.bitrateKbps = info.bitrateKbps }
         }
+        
+        // --- Додаємо обчислення Vocal Rider (Clip Gain) ---
+        let params = GainSuggester.Params(
+            targetDB: -18.0,       // Цільовий рівень
+            thresholdDB: -40.0,    // Не чіпати тишу (тільки шум)
+            minGainDB: -12.0,      // Максимальне зменшення
+            maxGainDB: 12.0,       // Максимальне підсилення
+            attackMs: 5.0,         // Швидкість реакції на гучний звук
+            releaseMs: 100.0,      // Швидкість реакції на тихий звук
+            windowMs: Double(r.windowMs)
+        )
+        r.suggestedGain = GainSuggester.suggest(windowRMSdB: r.windowRMSdB, params: params)
+        print("✅ Vocal Rider Computed! Envelope size: \(r.suggestedGain?.count ?? 0) windows.")
+        
         return r
     }
 }

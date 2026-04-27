@@ -109,10 +109,14 @@ class RiderPlayer: ObservableObject {
     
     private func startTimer() {
         stopTimer()
-        playbackTimer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { [weak self] _ in
-            self?.updateRealtime()
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.playbackTimer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { [weak self] _ in
+                self?.updateRealtime()
+            }
+            RunLoop.main.add(self.playbackTimer!, forMode: .common)
+            self.playbackTimer?.fire()
         }
-        RunLoop.main.add(playbackTimer!, forMode: .common)
     }
     
     private func stopTimer() {
@@ -122,13 +126,17 @@ class RiderPlayer: ObservableObject {
     
     // 🎚️ Магія Vocal Rider, що крутить "ручку гучності" кожну мілісекунду
     private func updateRealtime() {
+        
         guard let nodeTime = playerNode.lastRenderTime, playerNode.isPlaying else { return }
         guard let playerTime = playerNode.playerTime(forNodeTime: nodeTime) else { return }
         
         let sampleRate = playerTime.sampleRate
-        let fileTime = baseTime + Double(playerTime.sampleTime) / sampleRate
+        let fileTime = max(0.0, baseTime + Double(playerTime.sampleTime) / sampleRate)
         
-        self.currentTime = fileTime
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.currentTime = fileTime
+        }
         
         // Обчислення нового Gain (гучності) на основі нашої кривої Vocal Rider
         if let gainEnv = suggestedGain, !gainEnv.isEmpty {

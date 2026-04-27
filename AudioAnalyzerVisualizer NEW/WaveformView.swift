@@ -10,6 +10,7 @@ import AVFoundation
 
 struct WaveformView: View {
     let samplesDB: [Double] // negative dBFS values
+    var suggestedGain: [Double]? = nil // Масив з Vocal Rider (-12..12 dB)
     var lineColor: Color = .accentColor
     var showGrid: Bool = true
     var amplitudeScale: CGFloat = 1.0 // visual vertical zoom
@@ -135,6 +136,43 @@ struct WaveformView: View {
                         context.stroke(outline, with: .color(lineColor.opacity(0.9)), lineWidth: 1)
                     }
                 }
+                }
+                
+                // --- ДРУКИЙ КРОК: Малюємо лінію Vocal Rider (Gain Envelope) поверх хвилі ---
+                if let env = suggestedGain, !env.isEmpty, iStart < iEnd {
+                    var gainPath = Path()
+                    var hasMoved = false
+                    
+                    let maxGainVisual: Double = 12.0 // +/- 12 dB для візуалізації
+                    
+                    for i in iStart..<iEnd {
+                        guard i < env.count else { break }
+                        let gainValue = env[i] // від -12 до 12 (або більше/менше)
+                        
+                        // Нормалізуємо значення так, щоб 0 dB було рівно по центру
+                        // +12 dB буде вгорі (0), -12 dB буде внизу (h)
+                        let clampedGain = max(-maxGainVisual, min(maxGainVisual, gainValue))
+                        // Значення від -1.0 до 1.0 (-1 це низ, 1 це верх)
+                        let normalizedGain = CGFloat(clampedGain / maxGainVisual)
+                        
+                        let y = (h / 2.0) - (normalizedGain * (h / 2.0))
+                        
+                        let denom = max(CGFloat(visibleCount - 1), 1)
+                        let xf = (CGFloat(i - iStart) / denom) * max(w - 1, 1)
+                        let x = CGFloat(max(0, min(Int(w - 1), Int(xf))))
+                        
+                        if !hasMoved {
+                            gainPath.move(to: CGPoint(x: x, y: y))
+                            hasMoved = true
+                        } else {
+                            gainPath.addLine(to: CGPoint(x: x, y: y))
+                        }
+                    }
+                    
+                    if hasMoved {
+                        // Малюємо лінію гучності (наприклад, яскраво-жовтого кольору)
+                        context.stroke(gainPath, with: .color(.yellow), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                    }
                 }
             }
             .background(

@@ -65,12 +65,13 @@ Text(String(format: "Середній рівень: %.1f dBFS", res.averageRMSdB
                                         TimeRulerView(duration: res.duration, timeZoom: timeZoom, timeStart: timeStart)
                                             .frame(height: 20)
 
-                                    ZStack {
+                                            ZStack {
                                         RoundedRectangle(cornerRadius: 8)
                                             .fill(LinearGradient(colors: [Color.black.opacity(0.03), Color.black.opacity(0.06)], startPoint: .top, endPoint: .bottom))
                                             HStack(spacing: 6) {
                                                 WaveformView(
                                                     samplesDB: res.windowRMSdB,
+                                                    suggestedGain: res.suggestedGain, // Передаємо криву Vocal Rider сюди!
                                                     lineColor: .accentColor,
                                                     showGrid: true,
                                                     amplitudeScale: amplitudeScale,

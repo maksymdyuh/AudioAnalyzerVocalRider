@@ -17,6 +17,7 @@ enum GainSuggester {
         var attackMs: Double = 5.0             // Fast response when audio gets louder (fader down)
         var releaseMs: Double = 100.0          // Slow response when audio gets quieter (fader up)
         var windowMs: Double = 20.0            // Time elapsed per window element
+        var lookaheadMs: Double = 15.0         // Anticipate transients before they happen
     }
 
     static func suggest(windowRMSdB: [Double], params: Params) -> [Double] {
@@ -55,6 +56,20 @@ enum GainSuggester {
             }
             
             envelope[i] = currentGain
+        }
+        
+        // 3. Apply Lookahead (Shift timing backward to catch peaks early)
+        let shiftWindows = max(0, Int(round(p.lookaheadMs / p.windowMs)))
+        if shiftWindows > 0 {
+            var finalEnvelope = envelope
+            for i in 0..<envelope.count {
+                if i + shiftWindows < envelope.count {
+                    finalEnvelope[i] = envelope[i + shiftWindows]
+                } else {
+                    finalEnvelope[i] = envelope.last ?? 0.0
+                }
+            }
+            return finalEnvelope
         }
         
         return envelope

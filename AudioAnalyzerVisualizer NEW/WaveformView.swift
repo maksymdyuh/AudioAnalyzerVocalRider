@@ -11,6 +11,7 @@ import AVFoundation
 struct WaveformView: View {
     let samplesDB: [Double] // negative dBFS values
     var suggestedGain: [Double]? = nil // Масив з Vocal Rider (-12..12 dB)
+    var riderAmount: Double = 0.0 // Рівень втручання (0.0 .. 1.0)
     var lineColor: Color = .accentColor
     var showGrid: Bool = true
     var amplitudeScale: CGFloat = 1.0 // visual vertical zoom
@@ -95,7 +96,12 @@ struct WaveformView: View {
                     for i in iStart..<iEnd {
                         let idx = i
                         if idx < samplesDB.count {
-                            let amp = min(1.0, amplitude(from: samplesDB[idx]) * amplitudeScale)
+                            // Отримуємо "рекомендацію" Vocal Rider
+                            let gainAdjustment = (suggestedGain != nil && idx < suggestedGain!.count) ? suggestedGain![idx] : 0.0
+                            // Застосовуємо залежно від позиції ручки (0.0..1.0)
+                            let finalDB = samplesDB[idx] + (gainAdjustment * riderAmount)
+                            
+                            let amp = min(1.0, amplitude(from: finalDB) * amplitudeScale)
                             let xf = (CGFloat(i - iStart) / denom) * max(w - 1, 1)
                             let bx = min(widthInt - 1, max(0, Int(xf)))
                             minAmp[bx] = min(minAmp[bx], amp)
@@ -147,7 +153,7 @@ struct WaveformView: View {
                     
                     for i in iStart..<iEnd {
                         guard i < env.count else { break }
-                        let gainValue = env[i] // від -12 до 12 (або більше/менше)
+                        let gainValue = env[i] * riderAmount // від -12 до 12 (або більше/менше) з урахуванням слайдера
                         
                         // Нормалізуємо значення так, щоб 0 dB було рівно по центру
                         // +12 dB буде вгорі (0), -12 dB буде внизу (h)

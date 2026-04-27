@@ -1,0 +1,75 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild build -project "AudioAnalyzerVisualizer NEW.xcodeproj" -scheme "AudioAnalyzerVisualizer NEW" -destination platform=macOS
+
+ComputePackagePrebuildTargetDependencyGraph
+
+Prepare packages
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (1 target)
+    Target 'AudioAnalyzerVisualizer NEW' in project 'AudioAnalyzerVisualizer NEW' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk -x c -c /dev/null
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/usr/bin/actool --version --output-format xml1
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc --version
+
+ExecuteExternalTool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld -version_details
+
+Build description signature: f45179fbdb58d6c85d1534eeff8ee322
+Build description path: /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/AudioAnalyzerVisualizer_NEW-fapnrhxzgpzmscakqqvsfsoghrfd/Build/Intermediates.noindex/XCBuildData/f45179fbdb58d6c85d1534eeff8ee322.xcbuilddata
+ProcessProductPackaging "" /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/AudioAnalyzerVisualizer_NEW-fapnrhxzgpzmscakqqvsfsoghrfd/Build/Intermediates.noindex/AudioAnalyzerVisualizer\ NEW.build/Debug/AudioAnalyzerVisualizer\ NEW.build/AudioAnalyzerVisualizer\ NEW.app.xcent (in target 'AudioAnalyzerVisualizer NEW' from project 'AudioAnalyzerVisualizer NEW')
+    cd /Users/maksymdyuh/Documents/Coding/AudioAnalyzerVisualizer\ NEW
+    
+    Entitlements:
+    
+    {
+    "com.apple.security.app-sandbox" = 1;
+    "com.apple.security.files.user-selected.read-only" = 1;
+    "com.apple.security.get-task-allow" = 1;
+}
+    
+    builtin-productPackagingUtility -entitlements -format xml -o /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/AudioAnalyzerVisualizer_NEW-fapnrhxzgpzmscakqqvsfsoghrfd/Build/Intermediates.noindex/AudioAnalyzerVisualizer\ NEW.build/Debug/AudioAnalyzerVisualizer\ NEW.build/AudioAnalyzerVisualizer\ NEW.app.xcent
+
+ProcessProductPackagingDER /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/AudioAnalyzerVisualizer_NEW-fapnrhxzgpzmscakqqvsfsoghrfd/Build/Intermediates.noindex/AudioAnalyzerVisualizer\ NEW.build/Debug/AudioAnalyzerVisualizer\ NEW.build/AudioAnalyzerVisualizer\ NEW.app.xcent /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/AudioAnalyzerVisualizer_NEW-fapnrhxzgpzmscakqqvsfsoghrfd/Build/Intermediates.noindex/AudioAnalyzerVisualizer\ NEW.build/Debug/AudioAnalyzerVisualizer\ NEW.build/AudioAnalyzerVisualizer\ NEW.app.xcent.der (in target 'AudioAnalyzerVisualizer NEW' from project 'AudioAnalyzerVisualizer NEW')
+    cd /Users/maksymdyuh/Documents/Coding/AudioAnalyzerVisualizer\ NEW
+    /usr/bin/derq query -f xml -i /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/AudioAnalyzerVisualizer_NEW-fapnrhxzgpzmscakqqvsfsoghrfd/Build/Intermediates.noindex/AudioAnalyzerVisualizer\ NEW.build/Debug/AudioAnalyzerVisualizer\ NEW.build/AudioAnalyzerVisualizer\ NEW.app.xcent -o /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/AudioAnalyzerVisualizer_NEW-fapnrhxzgpzmscakqqvsfsoghrfd/Build/Intermediates.noindex/AudioAnalyzerVisualizer\ NEW.build/Debug/AudioAnalyzerVisualizer\ NEW.build/AudioAnalyzerVisualizer\ NEW.app.xcent.der --raw
+
+ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx26.0-25A352-28806144b0707e398aac92880fa50324.sdkstatcache
+    cd /Users/maksymdyuh/Documents/Coding/AudioAnalyzerVisualizer\ NEW/AudioAnalyzerVisualizer\ NEW.xcodeproj
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk -o /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/macosx26.0-25A352-28806144b0707e398aac92880fa50324.sdkstatcache
+
+ProcessInfoPlistFile /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/AudioAnalyzerVisualizer_NEW-fapnrhxzgpzmscakqqvsfsoghrfd/Build/Products/Debug/AudioAnalyzerVisualizer\ NEW.app/Contents/Info.plist /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/AudioAnalyzerVisualizer_NEW-fapnrhxzgpzmscakqqvsfsoghrfd/Build/Intermediates.noindex/AudioAnalyzerVisualizer\ NEW.build/Debug/AudioAnalyzerVisualizer\ NEW.build/empty-AudioAnalyzerVisualizer\ NEW.plist (in target 'AudioAnalyzerVisualizer NEW' from project 'AudioAnalyzerVisualizer NEW')
+    cd /Users/maksymdyuh/Documents/Coding/AudioAnalyzerVisualizer\ NEW
+    builtin-infoPlistUtility /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/AudioAnalyzerVisualizer_NEW-fapnrhxzgpzmscakqqvsfsoghrfd/Build/Intermediates.noindex/AudioAnalyzerVisualizer\ NEW.build/Debug/AudioAnalyzerVisualizer\ NEW.build/empty-AudioAnalyzerVisualizer\ NEW.plist -producttype com.apple.product-type.application -genpkginfo /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/AudioAnalyzerVisualizer_NEW-fapnrhxzgpzmscakqqvsfsoghrfd/Build/Products/Debug/AudioAnalyzerVisualizer\ NEW.app/Contents/PkgInfo -expandbuildsettings -platform macosx -additionalcontentfile /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/AudioAnalyzerVisualizer_NEW-fapnrhxzgpzmscakqqvsfsoghrfd/Build/Intermediates.noindex/AudioAnalyzerVisualizer\ NEW.build/Debug/AudioAnalyzerVisualizer\ NEW.build/assetcatalog_generated_info.plist -o /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/AudioAnalyzerVisualizer_NEW-fapnrhxzgpzmscakqqvsfsoghrfd/Build/Products/Debug/AudioAnalyzerVisualizer\ NEW.app/Contents/Info.plist
+
+CodeSign /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/AudioAnalyzerVisualizer_NEW-fapnrhxzgpzmscakqqvsfsoghrfd/Build/Products/Debug/AudioAnalyzerVisualizer\ NEW.app (in target 'AudioAnalyzerVisualizer NEW' from project 'AudioAnalyzerVisualizer NEW')
+    cd /Users/maksymdyuh/Documents/Coding/AudioAnalyzerVisualizer\ NEW
+    
+    Signing Identity:     "Sign to Run Locally"
+    
+    /usr/bin/codesign --force --sign - --entitlements /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/AudioAnalyzerVisualizer_NEW-fapnrhxzgpzmscakqqvsfsoghrfd/Build/Intermediates.noindex/AudioAnalyzerVisualizer\ NEW.build/Debug/AudioAnalyzerVisualizer\ NEW.build/AudioAnalyzerVisualizer\ NEW.app.xcent --timestamp\=none --generate-entitlement-der /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/AudioAnalyzerVisualizer_NEW-fapnrhxzgpzmscakqqvsfsoghrfd/Build/Products/Debug/AudioAnalyzerVisualizer\ NEW.app
+/Users/maksymdyuh/Library/Developer/Xcode/DerivedData/AudioAnalyzerVisualizer_NEW-fapnrhxzgpzmscakqqvsfsoghrfd/Build/Products/Debug/AudioAnalyzerVisualizer NEW.app: replacing existing signature
+
+Validate /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/AudioAnalyzerVisualizer_NEW-fapnrhxzgpzmscakqqvsfsoghrfd/Build/Products/Debug/AudioAnalyzerVisualizer\ NEW.app (in target 'AudioAnalyzerVisualizer NEW' from project 'AudioAnalyzerVisualizer NEW')
+    cd /Users/maksymdyuh/Documents/Coding/AudioAnalyzerVisualizer\ NEW
+    builtin-validationUtility /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/AudioAnalyzerVisualizer_NEW-fapnrhxzgpzmscakqqvsfsoghrfd/Build/Products/Debug/AudioAnalyzerVisualizer\ NEW.app -no-validate-extension -infoplist-subpath Contents/Info.plist
+
+RegisterWithLaunchServices /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/AudioAnalyzerVisualizer_NEW-fapnrhxzgpzmscakqqvsfsoghrfd/Build/Products/Debug/AudioAnalyzerVisualizer\ NEW.app (in target 'AudioAnalyzerVisualizer NEW' from project 'AudioAnalyzerVisualizer NEW')
+    cd /Users/maksymdyuh/Documents/Coding/AudioAnalyzerVisualizer\ NEW
+    /System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister -f -R -trusted /Users/maksymdyuh/Library/Developer/Xcode/DerivedData/AudioAnalyzerVisualizer_NEW-fapnrhxzgpzmscakqqvsfsoghrfd/Build/Products/Debug/AudioAnalyzerVisualizer\ NEW.app
+
+** BUILD SUCCEEDED **
+

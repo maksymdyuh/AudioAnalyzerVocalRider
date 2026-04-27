@@ -58,9 +58,31 @@ struct ContentView: View {
                                 VStack(alignment: .leading, spacing: 10) {
 Text(String(format: "Середній рівень: %.1f dBFS", res.averageRMSdB))
                                         .font(.headline)
-                                    Text(metaLine(result: res, url: doc.url))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                    
+                                    HStack {
+                                        Text(metaLine(result: res, url: doc.url))
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        
+                                        Spacer()
+                                        
+                                        // Слайдер (Rider Amount)
+                                        Text("Vocal Rider: \(Int(riderAmount * 100))%")
+                                            .font(.caption)
+                                            .bold()
+                                        Slider(value: Binding(
+                                            get: { riderAmount },
+                                            set: { newVal in
+                                                riderAmount = newVal
+                                                // Оновлюємо модель одразу
+                                                if let sel = model.selectedDocID {
+                                                    model.updateState(for: sel) { $0.riderAmount = newVal }
+                                                }
+                                            }
+                                        ), in: 0...1)
+                                        .frame(width: 150)
+                                    }
+                                    
                                     // Time ruler and current/total time
                                         TimeRulerView(duration: res.duration, timeZoom: timeZoom, timeStart: timeStart)
                                             .frame(height: 20)
@@ -72,6 +94,7 @@ Text(String(format: "Середній рівень: %.1f dBFS", res.averageRMSdB
                                                 WaveformView(
                                                     samplesDB: res.windowRMSdB,
                                                     suggestedGain: res.suggestedGain, // Передаємо криву Vocal Rider сюди!
+                                                    riderAmount: riderAmount,
                                                     lineColor: .accentColor,
                                                     showGrid: true,
                                                     amplitudeScale: amplitudeScale,
@@ -236,6 +259,7 @@ GeometryReader { geo in
                 self.timeStart = s.timeStart
                 self.amplitudeScale = s.amplitudeScale
                 self.playheadProgress = s.playheadProgress
+                self.riderAmount = s.riderAmount
                 self.lastSelectedID = sel
             }
             #if os(macOS)
@@ -300,6 +324,7 @@ GeometryReader { geo in
                     s.timeStart = self.timeStart
                     s.amplitudeScale = self.amplitudeScale
                     s.playheadProgress = self.playheadProgress
+                    s.riderAmount = self.riderAmount
                 }
             }
             // Restore state of new selection
@@ -309,6 +334,7 @@ GeometryReader { geo in
                 self.timeStart = s.timeStart
                 self.amplitudeScale = s.amplitudeScale
                 self.playheadProgress = s.playheadProgress
+                self.riderAmount = s.riderAmount
                 self.lastSelectedID = id
                 // Seek player position to this doc's playhead if same audio is loaded
                 if let doc = model.docs.first(where: { $0.id == id }), let res = doc.result {
@@ -323,6 +349,7 @@ GeometryReader { geo in
                     s.timeZoom = self.timeZoom
                     s.timeStart = self.timeStart
                     s.amplitudeScale = self.amplitudeScale
+                    s.riderAmount = self.riderAmount
                 }
             }
             #if os(macOS)
@@ -338,6 +365,7 @@ GeometryReader { geo in
                 s.timeZoom = self.timeZoom
                 s.timeStart = self.timeStart
                 s.amplitudeScale = self.amplitudeScale
+                s.riderAmount = self.riderAmount
             }
             let url = doc.url.resolvingSymlinksInPath()
             if audioPlayer == nil || audioPlayer?.url != url {
@@ -373,6 +401,7 @@ GeometryReader { geo in
                 s.timeStart = self.timeStart
                 s.amplitudeScale = self.amplitudeScale
                 s.playheadProgress = self.playheadProgress
+                s.riderAmount = self.riderAmount
             }
             if let cur = currentDB(res: res) {
                 if let peak = peakHoldDB {
@@ -425,6 +454,7 @@ GeometryReader { geo in
     @State private var isPlaying: Bool = false
     @State private var playheadProgress: Double = 0 // 0..1
     @State private var peakHoldDB: Double? = nil
+    @State private var riderAmount: Double = 0.0 // Додав нову ручку (слайдер) для Vocal Rider
 
     // Time navigation state (horizontal zoom and pan) — kept per selected doc
     @State private var timeZoom: CGFloat = 1.0

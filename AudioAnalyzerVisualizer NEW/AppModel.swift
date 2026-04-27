@@ -16,6 +16,7 @@ final class AppModel: ObservableObject {
         var timeStart: CGFloat = 0.0
         var amplitudeScale: CGFloat = 1.0
         var playheadProgress: Double = 0.0 // 0..1
+        var riderAmount: Double = 0.0 // 0.0 .. 1.0 (Vocal Rider flatten amount)
     }
 
     @Published var docs: [Doc] = []

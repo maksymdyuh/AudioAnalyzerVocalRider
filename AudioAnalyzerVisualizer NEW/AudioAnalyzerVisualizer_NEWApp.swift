@@ -31,7 +31,20 @@ struct AudioAnalyzerVisualizer_NEWApp: App {
 
     var playPauseNotification: Notification.Name { Notification.Name("AAVPlayPauseToggle") }
 
+    @CommandsBuilder
     var commands: some Commands {
+        CommandGroup(after: .saveItem) {
+            Button("Експортувати поточний...") {
+                NotificationCenter.default.post(name: NSNotification.Name("AAVExportCurrent"), object: nil)
+            }
+            .keyboardShortcut("e", modifiers: .command)
+            
+            Button("Експортувати всі...") {
+                NotificationCenter.default.post(name: NSNotification.Name("AAVExportAll"), object: nil)
+            }
+            .keyboardShortcut("e", modifiers: [.command, .shift])
+        }
+        
         CommandMenu("Відтворення") {
             Button("Відтворити/Пауза") {
                 NotificationCenter.default.post(name: playPauseNotification, object: nil)

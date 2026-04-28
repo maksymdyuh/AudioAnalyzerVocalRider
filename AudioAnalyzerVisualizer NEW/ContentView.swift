@@ -403,6 +403,21 @@ GeometryReader { geo in
                 audioPlayer.play(from: audioPlayer.currentTime)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("AAVExportCurrent"))) { _ in
+            guard let sel = model.selectedDocID, let doc = model.docs.first(where: { $0.id == sel }), doc.result != nil else { return }
+            docsToExport = [doc]
+            showingExportSheet = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("AAVExportAll"))) { _ in
+            let validDocs = model.docs.filter { $0.result != nil }
+            if !validDocs.isEmpty {
+                docsToExport = validDocs
+                showingExportSheet = true
+            }
+        }
+        .sheet(isPresented: $showingExportSheet) {
+            ExportView(docs: docsToExport)
+        }
         .onReceive(Timer.publish(every: 0.016, on: .main, in: .common).autoconnect()) { _ in
             // Use standard robust fallback if needed, but mainly we rely on the direct audioPlayer.currentTime binding.
             guard let sel = model.selectedDocID, let doc = model.docs.first(where: { $0.id == sel }), let res = doc.result else { return }
@@ -503,6 +518,9 @@ GeometryReader { geo in
         }
         return parts.joined(separator: " • ")
     }
+
+    @State private var showingExportSheet = false
+    @State private var docsToExport: [AppModel.Doc] = []
 
     private func currentDB(res: AnalysisResult) -> Double? {
         guard !res.windowRMSdB.isEmpty else { return nil }

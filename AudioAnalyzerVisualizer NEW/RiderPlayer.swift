@@ -28,6 +28,7 @@ class RiderPlayer: ObservableObject {
     
     // Щоб знати точний час програвання
     private var baseTime: Double = 0.0
+    private var playbackStartDate: Date?
     
     init() {
         engine.attach(playerNode)
@@ -61,23 +62,17 @@ class RiderPlayer: ObservableObject {
         let sampleRate = file.processingFormat.sampleRate
         let startFrame = AVAudioFramePosition(max(0, time) * sampleRate)
         let totalFrames = AVAudioFramePosition(file.length)
-        let framesCount = AVAudioFrameCount(totalFrames - startFrame)
         
-        if framesCount > 0 {
+        if totalFrames > startFrame {
+            let framesCount = AVAudioFrameCount(totalFrames - startFrame)
             playerNode.stop()
             let currentSessionId = UUID()
             self.playSessionID = currentSessionId
             
             // Плануємо шматок файлу
-            playerNode.scheduleSegment(file, startingFrame: startFrame, frameCount: framesCount, at: nil) {
-                // Викликається після завершення
-                DispatchQueue.main.async { [weak self] in
-                    guard let self = self, self.playSessionID == currentSessionId else { return }
-                    self.isPlaying = false
-                    self.stopTimer()
-                }
-            }
+            playerNode.scheduleSegment(file, startingFrame: startFrame, frameCount: framesCount, at: nil)
             baseTime = time
+            playbackStartDate = Date()
             playerNode.play()
             self.currentTime = time
             isPlaying = true
@@ -127,11 +122,10 @@ class RiderPlayer: ObservableObject {
     // 🎚️ Магія Vocal Rider, що крутить "ручку гучності" кожну мілісекунду
     private func updateRealtime() {
         
-        guard let nodeTime = playerNode.lastRenderTime, playerNode.isPlaying else { return }
-        guard let playerTime = playerNode.playerTime(forNodeTime: nodeTime) else { return }
+        guard let startDate = playbackStartDate, playerNode.isPlaying else { return }
         
-        let sampleRate = playerTime.sampleRate
-        let fileTime = max(0.0, baseTime + Double(playerTime.sampleTime) / sampleRate)
+        let elapsed = Date().timeIntervalSince(startDate)
+        let fileTime = max(0.0, baseTime + elapsed)
         
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }

@@ -393,18 +393,20 @@ GeometryReader { geo in
             } else {
                 // start playing
                 if let res = doc.result {
-                    audioPlayer.seek(to: currentTime(res: res))
+                    var targetTime = currentTime(res: res)
+                    if targetTime >= res.duration - 0.05 {
+                        targetTime = 0.0
+                        playheadProgress = 0.0
+                    }
+                    audioPlayer.seek(to: targetTime)
                 }
                 audioPlayer.play(from: audioPlayer.currentTime)
             }
         }
         .onReceive(Timer.publish(every: 0.016, on: .main, in: .common).autoconnect()) { _ in
-            // Advance playhead either by timer or bind to audioPlayer time
+            // Use standard robust fallback if needed, but mainly we rely on the direct audioPlayer.currentTime binding.
             guard let sel = model.selectedDocID, let doc = model.docs.first(where: { $0.id == sel }), let res = doc.result else { return }
-            if audioPlayer.isPlaying {
-                let actualCurrentTime = audioPlayer.currentTime
-                playheadProgress = min(1.0, actualCurrentTime / max(res.duration, 0.000001))
-            }
+            
             // Persist state periodically while doc is visible
             model.updateState(for: sel) { s in
                 s.timeZoom = self.timeZoom
@@ -420,7 +422,13 @@ GeometryReader { geo in
                     peakHoldDB = cur
                 }
             }
-            if playheadProgress >= 1.0 && audioPlayer.isPlaying { audioPlayer.stop() }
+            if audioPlayer.isPlaying && playheadProgress >= 1.0 { audioPlayer.stop() }
+        }
+        .onChange(of: audioPlayer.currentTime) { newTime in
+            guard let sel = model.selectedDocID, let doc = model.docs.first(where: { $0.id == sel }), let res = doc.result else { return }
+            if audioPlayer.isPlaying {
+                playheadProgress = min(1.0, newTime / max(res.duration, 0.000001))
+            }
         }
     }
 

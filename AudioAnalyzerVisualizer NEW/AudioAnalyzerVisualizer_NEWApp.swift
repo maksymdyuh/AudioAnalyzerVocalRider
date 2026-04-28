@@ -26,7 +26,10 @@ struct AudioAnalyzerVisualizer_NEWApp: App {
             .transition(.opacity)
             .environmentObject(model)
         }
-.defaultSize(width: 1200, height: 800)
+        .commands {
+            commands
+        }
+        .defaultSize(width: 1200, height: 800)
     }
 
     var playPauseNotification: Notification.Name { Notification.Name("AAVPlayPauseToggle") }

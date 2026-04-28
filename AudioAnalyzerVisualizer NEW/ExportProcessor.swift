@@ -7,7 +7,7 @@ class ExportProcessor {
         let outputFilename = prefix + filename
         let ext = doc.url.pathExtension.isEmpty ? "wav" : doc.url.pathExtension
         let finalURL = outputURL.appendingPathComponent(outputFilename).appendingPathExtension(ext)
-        print("Exporting \(doc.url) to \(finalURL)")
+        print("Exporting \(doc.url.path) to \(finalURL.path)")
         
         let engine = AVAudioEngine()
         let playerNode = AVAudioPlayerNode()
@@ -25,12 +25,16 @@ class ExportProcessor {
         let format = audioFile.processingFormat
         
         // Setup offline rendering
-        guard let outFile = try? AVAudioFile(forWriting: finalURL, settings: format.settings, commonFormat: format.commonFormat, interleaved: format.isInterleaved) else {
+        let outFile: AVAudioFile
+        do {
+            outFile = try AVAudioFile(forWriting: finalURL, settings: format.settings, commonFormat: format.commonFormat, interleaved: format.isInterleaved)
+        } catch {
+            print("Failed to start writing file to \(finalURL.path): \(error)")
             return
         }
-        
+            
         let maxFrames: AVAudioFrameCount = 4096
-        try? engine.enableManualRenderingMode(.offline, format: format, maximumFrameCount: maxFrames)
+            try? engine.enableManualRenderingMode(.offline, format: format, maximumFrameCount: maxFrames)
         
         try? engine.start()
         playerNode.scheduleFile(audioFile, at: nil, completionHandler: nil)

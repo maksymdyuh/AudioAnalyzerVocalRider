@@ -32,11 +32,11 @@ struct StartView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Text("Аналізатор гучності аудіо")
+            Text("Оберіть або перетягніть аудіофайли (WAV/AIFF/CAF/MP3/M4A)")
                 .font(.title)
                 .bold()
-            Text("Оберіть або перетягніть аудіофайли (WAV/AIFF/CAF/MP3/M4A)")
-                .foregroundStyle(.secondary)
+           // Text("Оберіть або перетягніть аудіофайли (WAV/AIFF/CAF/MP3/M4A)")
+        //    .foregroundStyle(.secondary)
 
             HStack(spacing: 12) {
                 Button {
